@@ -1,15 +1,4 @@
-import express from 'express';
-import cors from 'cors';
 import { WebSocketServer } from 'ws';
-
-const app = express();
-const port = process.env.PORT || 5000;
-
-const corsOptions = {
-  origin: '*', // Allow all origins or specify your frontend URL
-};
-app.use(cors(corsOptions));
-app.use(express.json());
 
 // Set initial and target data values
 const targetData = {
@@ -22,9 +11,11 @@ const targetData = {
   loyaltyPointEarn: 100000000,
   loyaltyPointRedeem: 70000000,
   orderPlacedUsingLoyaltyPoint: 100000,
+  orderPlacedUsingCashback: 100000,
+  orderPlacedUsingStoreCredit: 200000,
 };
 
-// Set initial values to 0
+
 let data = {
   totalSales: 0,
   giftCardSold: 0,
@@ -35,14 +26,16 @@ let data = {
   loyaltyPointEarn: 0,
   loyaltyPointRedeem: 0,
   orderPlacedUsingLoyaltyPoint: 0,
+  orderPlacedUsingCashback: 0,
+  orderPlacedUsingStoreCredit: 0,
 };
 
-// Duration of the campaign in hours and update interval in milliseconds
+
 const totalDurationHours = 96;
 const updateIntervalMs = 10 * 1000;
 const totalUpdates = (totalDurationHours * 60 * 60 * 1000) / updateIntervalMs;
 
-// Calculate incremental steps for each data point
+
 const incrementSteps = {
   totalSales: targetData.totalSales / totalUpdates,
   giftCardSold: targetData.giftCardSold / totalUpdates,
@@ -53,9 +46,11 @@ const incrementSteps = {
   loyaltyPointEarn: targetData.loyaltyPointEarn / totalUpdates,
   loyaltyPointRedeem: targetData.loyaltyPointRedeem / totalUpdates,
   orderPlacedUsingLoyaltyPoint: targetData.orderPlacedUsingLoyaltyPoint / totalUpdates,
+  orderPlacedUsingCashback: targetData.orderPlacedUsingCashback / totalUpdates,
+  orderPlacedUsingStoreCredit: targetData. orderPlacedUsingStoreCredit / totalUpdates,
 };
 
-// Function to update data gradually
+
 const updateData = () => {
   data = {
     totalSales: Math.min(data.totalSales + incrementSteps.totalSales, targetData.totalSales),
@@ -67,33 +62,38 @@ const updateData = () => {
     loyaltyPointEarn: Math.min(data.loyaltyPointEarn + incrementSteps.loyaltyPointEarn, targetData.loyaltyPointEarn),
     loyaltyPointRedeem: Math.min(data.loyaltyPointRedeem + incrementSteps.loyaltyPointRedeem, targetData.loyaltyPointRedeem),
     orderPlacedUsingLoyaltyPoint: Math.min(data.orderPlacedUsingLoyaltyPoint + incrementSteps.orderPlacedUsingLoyaltyPoint, targetData.orderPlacedUsingLoyaltyPoint),
+    orderPlacedUsingCashback: Math.min(data.orderPlacedUsingCashback + incrementSteps.orderPlacedUsingCashback, targetData.orderPlacedUsingCashback),
+    orderPlacedUsingStoreCredit: Math.min(data.orderPlacedUsingStoreCredit + incrementSteps.orderPlacedUsingStoreCredit, targetData.orderPlacedUsingStoreCredit),
   };
 };
 
-// Start server
-const server = app.listen(port, () => {
-  console.log(`Server is running on port: ${port}`);
-  
+
+const wss = new WebSocketServer({ port: 5000 });
+
+wss.on('connection', (ws) => {
+  console.log('New client connected');
+
+  ws.send(JSON.stringify(data));
+
+  ws.on('close', () => {
+    console.log('Client disconnected');
+  });
 });
 
-// WebSocket server
-const wss = new WebSocketServer({ server });
 
-// Broadcast data to all connected clients
 const broadcastData = () => {
   const jsonData = JSON.stringify(data);
-  
   wss.clients.forEach((client) => {
     if (client.readyState === client.OPEN) {
       client.send(jsonData);
-      
-      
     }
   });
 };
 
-// Update and broadcast data periodically
+
 setInterval(() => {
   updateData();
   broadcastData();
 }, updateIntervalMs);
+
+console.log('WebSocket server is running on port 5000');
